@@ -1,0 +1,9 @@
+**/Debug/
+**/.settings/
+/.vscode/
+
+*.bin
+*.hex
+*.a
+*.o
+*.elf
