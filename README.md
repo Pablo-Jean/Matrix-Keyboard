@@ -99,18 +99,24 @@ typedef struct{
 
 ### API
 
-`mk_status_e mk_init(mk_t *Mk)`: This function initialized the `mk_t` variable with the provided parameters. The return STATUS can be:
+#### mk_status_e mk_init(mk_t *Mk)
+
+This function initialized the `mk_t` variable with the provided parameters. The return STATUS can be:
 
 - MK_STATUS_OK: Everything is fine
 - MK_STATUS_INCORRET_PARAMS: some privided parameter is incorrect and not allowed
 
-`mk_status_e mk_get_button(mk_t *Mk, uint32_t *pPressedCol, uint32_t *pPressedRow)`: Gives you the pressed button, based on Column and Row pressed, the values can be 1 to the max number of the row/column. If no key is detected, the values of pPressedCol and pPressedRow is `0`. Can provide the following returns;
+#### mk_status_e mk_get_button(mk_t *Mk, uint32_t *pPressedCol, uint32_t *pPressedRow)
+
+Gives you the pressed button, based on Column and Row pressed, the values can be 1 to the max number of the row/column. If no key is detected, the values of pPressedCol and pPressedRow is `0`. Can provide the following returns;
 
 - MK_STATUS_OK: Everything is fine
 - MK_STATUS_INCORRET_PARAMS: some parameters was NULL
 - MK_STATUS_NOT_INITIALIZED: the mk_init functions wasn't called for the `Mk` instance.
 
-`mk_status_e mk_DoOperation(mk_t *Mk, mk_event_e *Ev)`: Must be called periodically, this function does the detection of Rows, and turning on/off the Columns. Is responsible to call the `callback`, if events are enabled. The `Ev` parameter can be NULL. Can provide the following returns;
+#### mk_status_e mk_DoOperation(mk_t *Mk, mk_event_e *Ev)
+
+Must be called periodically, this function does the detection of Rows, and turning on/off the Columns. Is responsible to call the `callback`, if events are enabled. The `Ev` parameter can be NULL. Can provide the following returns;
 
 - MK_STATUS_OK: Everything is fine
 - MK_STATUS_INCORRET_PARAMS: `Mk` was NULL
