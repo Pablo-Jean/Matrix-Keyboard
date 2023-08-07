@@ -127,10 +127,10 @@ mk_gpio_t ColGpios[4] = {
 		{(uint32_t)(MBTN_C3_GPIO_Port), MBTN_C3_Pin}
 };
 mk_gpio_t RowGpios[4] = {
-		{(uint32_t)(MBTN_R0_GPIO_Port), MBTN_R0_Pin,
-		{(uint32_t)(MBTN_R1_GPIO_Port), MBTN_R1_Pin,
-		{(uint32_t)(MBTN_R2_GPIO_Port), MBTN_R2_Pin,
-		{(uint32_t)(MBTN_R3_GPIO_Port), MBTN_R3_Pin
+		{(uint32_t)(MBTN_R0_GPIO_Port), MBTN_R0_Pin},
+		{(uint32_t)(MBTN_R1_GPIO_Port), MBTN_R1_Pin},
+		{(uint32_t)(MBTN_R2_GPIO_Port), MBTN_R2_Pin},
+		{(uint32_t)(MBTN_R3_GPIO_Port), MBTN_R3_Pin} 
 };
 
 void main(){
@@ -154,4 +154,4 @@ void main(){
 }
 ```
 
-`... I will finish the documentation later`
+`... in construction`
