@@ -35,6 +35,87 @@ matrix_keyboard
 - `mk_platform.h` has the prototypes of gpio basic functions, this will allow you to 'connect' to any chipset.
 - `mk_platform_blank.c` is a blank file that you can use to implement the chipset routines for the GPIO read and write
 
+### Instance Struct
+
+```C
+typedef struct{
+// Parameters that must be provided by developer
+	/**
+	 * The columns must be configured as outputs
+	 * That can be Push-Pull or Open-drain/collector
+	 */
+	mk_gpio_t *gCols;
+	/**
+	 * The Rows must be configured as inputs, the
+	 * Pull resistors must be set according with the
+	 * Columns config and Active Level
+	 */
+	mk_gpio_t *gRows;
+	/**
+	 * The absolute number of columns and rows
+	 * Must be greater or equal 2.
+	 * Yes, we do not accept 1 row/column keyboard
+	 */
+	uint32_t nCols;
+	uint32_t nRows;
+	/**
+	 * The active level indicates the signal will
+	 * indicate that the button was pressed.
+	 * An example of a correctly actLevel is:
+	 * - Columns: Configured as Open-Drain
+	 * - Rows: Configured as Inputs with Pull-Ups
+	 * - actLevel: Configured for Low level (MK_ACTIVE_LEVEL_LOW)
+	 */
+	mk_active_level_e actLevel;
+	/**
+	 * Select the events that must ne called on callback
+	 * MK_EVENT_RELEASED: When detecting a releasing of button
+	 * MK_EVENT_PRESSED: When detecting a pressing of a button
+	 *
+	 * You can select one or more events, using OR:
+	 * eventMask = (MK_EVENT_RELEASED | MK_EVENT_PRESSED)
+	 * or you can select all:
+	 * eventMask = MK_EVENT_ALL
+	 *
+	 * If you leave this field with no event, the callback will
+	 * never me called.
+	 */
+	uint8_t eventMask;
+
+// the below values must not be changed by developer
+	// is only for internal use
+	struct{
+		uint8_t _mkInit;
+		uint32_t _actCol;
+		uint32_t _actRow;
+		uint32_t _prevColState;
+		uint32_t _prevRowState;
+		uint32_t _testCol;
+		GPIO_PinState _onSignal;
+		GPIO_PinState _offSignal;
+	}_internal;
+}mk_t;
+```
+
+### API
+
+`mk_status_e mk_init(mk_t *Mk)`: This function initialized the `mk_t` variable with the provided parameters. The return STATUS can be:
+
+- MK_STATUS_OK: Everything is fine
+- MK_STATUS_INCORRET_PARAMS: some privided parameter is incorrect and not allowed
+
+`mk_status_e mk_get_button(mk_t *Mk, uint32_t *pPressedCol, uint32_t *pPressedRow)`: Gives you the pressed button, based on Column and Row pressed, the values can be 1 to the max number of the row/column. If no key is detected, the values of pPressedCol and pPressedRow is `0`. Can provide the following returns;
+
+- MK_STATUS_OK: Everything is fine
+- MK_STATUS_INCORRET_PARAMS: some parameters was NULL
+- MK_STATUS_NOT_INITIALIZED: the mk_init functions wasn't called for the `Mk` instance.
+
+`mk_status_e mk_DoOperation(mk_t *Mk, mk_event_e *Ev)`: Must be called periodically, this function does the detection of Rows, and turning on/off the Columns. Is responsible to call the `callback`, if events are enabled. The `Ev` parameter can be NULL. Can provide the following returns;
+
+- MK_STATUS_OK: Everything is fine
+- MK_STATUS_INCORRET_PARAMS: `Mk` was NULL
+- MK_STATUS_NOT_INITIALIZED: the `mk_init` functions wasn't called for the `Mk` instance.
+
 ### 1. Implement the platform functions
 
 You need to implement only two things related to the chipset, on the mk_platform_xx.c: 
@@ -179,8 +260,121 @@ The GPIOs are previously configured on the CubeMX plugin, with Outputs, in this 
 
 ### 3. Call the Operation function periodically
 
-After the initialization, the function `mk_DoOperation` must be called periodically, this will read a Column, check for the signal of the rows, turn on the next Column, and give back an event if anything was changed. You can do this in two ways:
+After the initialization, the function `mk_DoOperation` must be called periodically, this will read a Column, check for the signal of the rows, turn on the next Column, and give back an event if anything was changed. Remember, every `DoOperation` command only check for one columns, the next will be readed on a new call, in other words, a full check of the keyboard requires the Number of Columns multiplied by the time period of the function calling. But, if a key was detected, the API doesn't check for the next columns, it will return to the next column, and give back the PRESSED event.
+
+You can do this in two ways:
 
 #### Polling
 
 You can call this function inside the main loop or in an RTOS task. Every time you call the function, you can check the event provided by the parameter. In this case, the event is independent of the eventMask.
+
+Below, an example of using the main loop to process the matrix;
+
+```C
+void main(){
+    mk_event_e MkEvent;
+    mk_error_e MkError;
+    uint32_t BtnCol, BtnRow;
+    // ....... 
+
+    while (1){
+        // ....... 
+
+        MkError = mk_DoOperation(&Mk, &MkEvent);
+        if (MkError != MK_STATUS_OK){
+            assert(0);
+        }
+        // we detected a PRESSED event
+        if (MkEvent == MK_EVENT_PRESSED){
+            // So, you just need to call this function to get the Column and Row of
+            // the pressed button
+            // This event triggered only one time, while the key is pressed
+            mk_get_button(&Mk, &BtnCol, &BtnRow);
+        }
+        else if (MkEvent == MK_EVENT_RELEASED){
+            // the button was released, and no other button was pressed
+        }
+
+        // ....... 
+        osDelay(50);
+    }
+
+    // ......
+}
+```
+
+If you use an RTOS, you can do with a dedicated task.
+
+```C
+void xKeyTask(void *pvParams){
+    mk_event_e MkEvent;
+    mk_error_e MkError;
+    // ....... 
+
+    while (1){
+        // ....... 
+
+        MkError = mk_DoOperation(&Mk, &MkEvent);
+        if (MkError != MK_STATUS_OK){
+            assert(0);
+        }
+        // we detected a PRESSED event
+        if (MkEvent == MK_EVENT_PRESSED){
+            // you can trigger a semaphore to inform a main task that
+            // a button is pressed
+        }
+        else if (MkEvent == MK_EVENT_RELEASED){
+            // same as before
+        }
+
+        // ....... 
+        vTaskSleep(pdMS_TO_TICKS(50));
+    }
+
+    // ......
+}
+```
+
+#### Timer Interrupt
+
+The `DoOperation` doens't have any delay inside, the function is builded to check the column previously enabled in last cycle, so, avoiding any use of delay to make sure that the signal is stable.
+
+This bring the advantage to implement on a Periodic Timer Interrupt, the example below, hhow you how to use the a timer interrupt and the callback function.
+
+```C
+// In this example, the Timer 4 was configured to trigger the interrupt
+// every 10 ms
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if (htim->Instance == TIM4){
+		mk_DoOperation(&Mk, NULL);
+	}
+}
+
+// The callback of API
+void mk_callback(mk_t *Mk, mk_event_e ev, uint32_t PressedCol, uint32_t PressedRow){
+    if (ev == MK_EVENT_PRESSED){
+        // load the PressedCol and PressedRow on you global variables and
+        // inform the main that a PRESSED event was occoured
+    }
+    else if (ev == MK_EVENT_RELEASE){
+        // inform the main that the key was released
+    }
+}
+
+// The Main Loop
+void main(){
+    // ....... 
+    HAL_TIM_Base_Start_IT(&htim4);
+    while (1){
+        // ......
+    }
+
+    // ......
+}
+```
+
+Remember, the callback only will be called for the selected events on eventMask. 
+
+## Have fun
+
+If you followed the guide, the library must works perfectly. Any doubts, you can open an issue, or if you find any problem.
